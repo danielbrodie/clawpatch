@@ -181,6 +181,8 @@ ${customPrompt.trim()}
   const validEvidencePaths = [
     ...new Set(includedFiles.filter((file) => file.readable).map((file) => file.path)),
   ];
+  const cudaBlock =
+    mode === "default" && featureIncludesCuda(feature) ? `\n${cudaGuidance()}\n` : "";
   const prompt = `You are reviewing one semantic feature for clawpatch.
 
 Return strict JSON only. No markdown fences.
@@ -204,7 +206,7 @@ ${customBlock}Review categories:
 - release/build hazards
 - maintainability risks with concrete impact
 
-${reviewModeInstructions(mode)}
+${reviewModeInstructions(mode)}${cudaBlock}
 
 Inspect owned files, context files, and linked tests. Treat included tests as first-class
 evidence of intended behavior. If tests contradict a suspected bug, either skip it or
@@ -343,6 +345,25 @@ function reviewModeInstructions(mode: ReviewMode): string {
 - do not report correctness, security, API contract, data-loss, or build-release issues unless the root cause is accidental complexity and the minimum fix is simplification`;
   }
   throw new Error(`Unsupported review mode: ${mode}`);
+}
+
+function featureIncludesCuda(feature: FeatureRecord): boolean {
+  const paths = [
+    ...feature.entrypoints.map((entrypoint) => entrypoint.path),
+    ...feature.ownedFiles.map((file) => file.path),
+  ];
+  return paths.some((path) => /\.cuh?$/iu.test(path));
+}
+
+function cudaGuidance(): string {
+  return `CUDA hazards (this feature includes CUDA .cu/.cuh sources) — inspect for:
+- Kernel data races; missing, divergent, or conditionally-reached __syncthreads()/__syncwarp() barriers.
+- Unchecked CUDA runtime calls (cudaMalloc, cudaMemcpy, cudaFree, async copies) and missing cudaGetLastError()/cudaDeviceSynchronize() after a kernel launch.
+- Host vs. device pointer confusion: dereferencing device memory on the host, or passing the wrong memory space or copy direction to cudaMemcpy.
+- Out-of-bounds or uncoalesced global-memory access, shared-memory bank conflicts, and blockIdx/threadIdx-derived indices used without bounds checks.
+- Stream and event synchronization errors, including use-after-free across asynchronous copies.
+- Device-memory leaks: allocations not freed on every return path.
+Map findings to the existing categories (concurrency, bug, data-loss, performance). Report only hazards visible in the included code; do not speculate about GPU runtime behavior you cannot see.`;
 }
 
 export async function buildRevalidatePrompt(root: string, findingJson: string): Promise<string> {
