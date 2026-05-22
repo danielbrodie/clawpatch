@@ -37,6 +37,9 @@
 - Fixed Bun package-manager detection to recognize the text `bun.lock` lockfile, thanks @austinm911.
 - Fixed review-output schema to tolerate optional `reproduction` and `minimumFixScope` fields and zero-valued evidence line numbers (normalized to `null`), recovering 4 of 28 zod issue patterns observed in run `20260517T190759-3c9e9e` (78 errors over 1000 features) that previously dropped whole-feature output instead of the affected finding.
 - Added CUDA support to C/C++ mapping so `.cu` / `.cuh` sources are mapped through standalone `main()`, CMake (`add_executable` / `add_library` and legacy `FindCUDA` `cuda_add_executable` / `cuda_add_library`), and autotools shapes, CUDA targets are tagged `cuda`, and repositories with CUDA sources are detected as `cuda` projects.
+- Added residual C/C++/CUDA source-group mapping so source files outside any CMake/autotools/`main()` target are grouped per directory into bounded review slices.
+- Added conservative C/C++/CUDA validation command defaults from a root `Makefile` `check`/`test` target or a declared `CMakePresets.json` build workflow, and mapped `CMakeLists.txt`, `CMakePresets.json`, and `configure.ac` as config features.
+- Added the `concurrency` trust boundary to CUDA build targets and source groups.
 
 ## 0.3.0 - 2026-05-18
 

@@ -90,7 +90,7 @@ delegating to a `cOrCppDefaultCommands(root)` helper:
   a `test:` target, else `null`.
 - **Else a root `CMakePresets.json`** declaring an unambiguous build workflow:
   - exactly one `workflowPresets` entry → `typecheck:
-    "cmake --workflow --preset <name>"`;
+"cmake --workflow --preset <name>"`;
   - else exactly one `configurePresets` entry **and** one `buildPresets` entry →
     `typecheck: "cmake --preset <cfg> && cmake --build --preset <build>"`;
   - exactly one `testPresets` entry → `test: "ctest --preset <name>"`;

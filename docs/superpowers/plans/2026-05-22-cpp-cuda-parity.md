@@ -19,6 +19,7 @@
 Moves the language-classification helpers into `shared.ts` so the new groups module can reuse them, adds a `withCudaConcurrency` helper, and tags every CUDA feature with the `concurrency` trust boundary.
 
 **Files:**
+
 - Modify: `src/mappers/shared.ts` (add classification helpers)
 - Modify: `src/mappers/c-cpp.ts` (drop the local helpers, import from shared, apply the boundary)
 - Test: `src/mapper.test.ts`
@@ -28,21 +29,21 @@ Moves the language-classification helpers into `shared.ts` so the new groups mod
 Add this test in `src/mapper.test.ts` immediately after the existing `it("detects CUDA projects from .cu sources", …)` test:
 
 ```ts
-  it("tags CUDA build targets with the concurrency trust boundary", async () => {
-    const root = await fixtureRoot("clawpatch-cuda-concurrency-");
-    await writeFixture(
-      root,
-      "CMakeLists.txt",
-      "project(gpuapp CUDA)\nadd_executable(gpuapp src/main.cu)\n",
-    );
-    await writeFixture(root, "src/main.cu", "int main(void) { return 0; }\n");
+it("tags CUDA build targets with the concurrency trust boundary", async () => {
+  const root = await fixtureRoot("clawpatch-cuda-concurrency-");
+  await writeFixture(
+    root,
+    "CMakeLists.txt",
+    "project(gpuapp CUDA)\nadd_executable(gpuapp src/main.cu)\n",
+  );
+  await writeFixture(root, "src/main.cu", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
-    const result = await mapFeatures(root, project, []);
-    const gpuapp = result.features.find((feature) => feature.title === "CMake binary gpuapp");
+  const project = await detectProject(root);
+  const result = await mapFeatures(root, project, []);
+  const gpuapp = result.features.find((feature) => feature.title === "CMake binary gpuapp");
 
-    expect(gpuapp?.trustBoundaries).toContain("concurrency");
-  });
+  expect(gpuapp?.trustBoundaries).toContain("concurrency");
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -123,14 +124,14 @@ Expected: every test passes **except** `tags CUDA build targets with the concurr
 
 In `src/mappers/c-cpp.ts`, wrap the `trustBoundaries` value at each of the six seed-creation sites. Find each by its `source:` field; the transformation depends on the current `trustBoundaries` expression:
 
-| Seed `source` | Current `trustBoundaries:` | New `trustBoundaries:` |
-|---|---|---|
+| Seed `source`   | Current `trustBoundaries:`                     | New `trustBoundaries:`                                                   |
+| --------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
 | `autotools-bin` | `["user-input", "filesystem", "process-exec"]` | `withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag)` |
-| `autotools-lib` | `packageTrustBoundaries(target)` | `withCudaConcurrency(packageTrustBoundaries(target), tag)` |
-| `cmake-test` | `[]` | `withCudaConcurrency([], languageTag(testEntryPath))` |
-| `cmake-bin` | `["user-input", "filesystem", "process-exec"]` | `withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag)` |
-| `cmake-lib` | `packageTrustBoundaries(target)` | `withCudaConcurrency(packageTrustBoundaries(target), tag)` |
-| `c-main` | `["user-input", "filesystem", "process-exec"]` | `withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag)` |
+| `autotools-lib` | `packageTrustBoundaries(target)`               | `withCudaConcurrency(packageTrustBoundaries(target), tag)`               |
+| `cmake-test`    | `[]`                                           | `withCudaConcurrency([], languageTag(testEntryPath))`                    |
+| `cmake-bin`     | `["user-input", "filesystem", "process-exec"]` | `withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag)` |
+| `cmake-lib`     | `packageTrustBoundaries(target)`               | `withCudaConcurrency(packageTrustBoundaries(target), tag)`               |
+| `c-main`        | `["user-input", "filesystem", "process-exec"]` | `withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag)` |
 
 For `autotools-bin`, `autotools-lib`, `cmake-bin`, `cmake-lib`, and `c-main` a local `const tag = languageTag(...)` already exists in scope. The `cmake-test` seed has no `tag` variable — pass `languageTag(testEntryPath)` directly as shown.
 
@@ -158,6 +159,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 2: Map build-config files as config features
 
 **Files:**
+
 - Modify: `src/mappers/config.ts`
 - Test: `src/mapper.test.ts`
 
@@ -166,21 +168,21 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Add this test in `src/mapper.test.ts` after the test added in Task 1:
 
 ```ts
-  it("maps CMake and autotools build files as config features", async () => {
-    const root = await fixtureRoot("clawpatch-build-config-");
-    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
-    await writeFixture(root, "CMakePresets.json", '{"version":6}\n');
-    await writeFixture(root, "configure.ac", "AC_INIT([app],[1.0])\n");
-    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+it("maps CMake and autotools build files as config features", async () => {
+  const root = await fixtureRoot("clawpatch-build-config-");
+  await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+  await writeFixture(root, "CMakePresets.json", '{"version":6}\n');
+  await writeFixture(root, "configure.ac", "AC_INIT([app],[1.0])\n");
+  await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
-    const result = await mapFeatures(root, project, []);
-    const titles = result.features.map((feature) => feature.title);
+  const project = await detectProject(root);
+  const result = await mapFeatures(root, project, []);
+  const titles = result.features.map((feature) => feature.title);
 
-    expect(titles).toContain("Project config CMakeLists.txt");
-    expect(titles).toContain("Project config CMakePresets.json");
-    expect(titles).toContain("Project config configure.ac");
-  });
+  expect(titles).toContain("Project config CMakeLists.txt");
+  expect(titles).toContain("Project config CMakePresets.json");
+  expect(titles).toContain("Project config configure.ac");
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -221,6 +223,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Adds a C/C++/CUDA branch to `languageDefaultCommands` that emits `make` commands only when a root `Makefile` exists, and a `test` command only when the Makefile declares a `check`/`test` target.
 
 **Files:**
+
 - Modify: `src/detect.ts`
 - Test: `src/mapper.test.ts`
 
@@ -229,27 +232,27 @@ Adds a C/C++/CUDA branch to `languageDefaultCommands` that emits `make` commands
 Add these two tests in `src/mapper.test.ts` after the Task 2 test:
 
 ```ts
-  it("defaults C/C++ validation to make when the Makefile declares a check target", async () => {
-    const root = await fixtureRoot("clawpatch-cpp-makefile-check-");
-    await writeFixture(root, "Makefile", "all:\n\tcc -o app main.c\n\ncheck:\n\t./app\n");
-    await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
+it("defaults C/C++ validation to make when the Makefile declares a check target", async () => {
+  const root = await fixtureRoot("clawpatch-cpp-makefile-check-");
+  await writeFixture(root, "Makefile", "all:\n\tcc -o app main.c\n\ncheck:\n\t./app\n");
+  await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBe("make");
-    expect(project.detected.commands.test).toBe("make check");
-  });
+  expect(project.detected.commands.typecheck).toBe("make");
+  expect(project.detected.commands.test).toBe("make check");
+});
 
-  it("defaults C/C++ validation to make with no test command when the Makefile has none", async () => {
-    const root = await fixtureRoot("clawpatch-cpp-makefile-notest-");
-    await writeFixture(root, "Makefile", "all:\n\tcc -o app main.c\n");
-    await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
+it("defaults C/C++ validation to make with no test command when the Makefile has none", async () => {
+  const root = await fixtureRoot("clawpatch-cpp-makefile-notest-");
+  await writeFixture(root, "Makefile", "all:\n\tcc -o app main.c\n");
+  await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBe("make");
-    expect(project.detected.commands.test).toBeNull();
-  });
+  expect(project.detected.commands.typecheck).toBe("make");
+  expect(project.detected.commands.test).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -262,13 +265,9 @@ Expected: both new `defaults C/C++ validation to make …` tests FAIL — `typec
 In `src/detect.ts`, in `languageDefaultCommands`, add this branch immediately before the final `return { typecheck: null, lint: null, format: null, test: null };`:
 
 ```ts
-  if (
-    languages.includes("c") ||
-    languages.includes("cpp") ||
-    languages.includes("cuda")
-  ) {
-    return cOrCppDefaultCommands(root);
-  }
+if (languages.includes("c") || languages.includes("cpp") || languages.includes("cuda")) {
+  return cOrCppDefaultCommands(root);
+}
 ```
 
 Then add these functions immediately after the `rubyDefaultCommands` function:
@@ -324,6 +323,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Extends `cOrCppDefaultCommands` to emit a CMake command only when the project declares its build workflow in `CMakePresets.json`.
 
 **Files:**
+
 - Modify: `src/detect.ts`
 - Test: `src/mapper.test.ts`
 
@@ -332,63 +332,63 @@ Extends `cOrCppDefaultCommands` to emit a CMake command only when the project de
 Add these four tests in `src/mapper.test.ts` after the Task 3 tests. The first drives the new code; the last three are regression guards for the conservative boundary (they verify clawpatch does **not** invent a command):
 
 ```ts
-  it("emits a CMake workflow preset validation command when one is declared", async () => {
-    const root = await fixtureRoot("clawpatch-cmake-preset-");
-    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
-    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
-    await writeFixture(
-      root,
-      "CMakePresets.json",
-      JSON.stringify({ version: 6, workflowPresets: [{ name: "default", steps: [] }] }),
-    );
+it("emits a CMake workflow preset validation command when one is declared", async () => {
+  const root = await fixtureRoot("clawpatch-cmake-preset-");
+  await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+  await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+  await writeFixture(
+    root,
+    "CMakePresets.json",
+    JSON.stringify({ version: 6, workflowPresets: [{ name: "default", steps: [] }] }),
+  );
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBe("cmake --workflow --preset default");
-  });
+  expect(project.detected.commands.typecheck).toBe("cmake --workflow --preset default");
+});
 
-  it("emits no C/C++ validation command for a CMake project without presets", async () => {
-    const root = await fixtureRoot("clawpatch-cmake-nopreset-");
-    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
-    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+it("emits no C/C++ validation command for a CMake project without presets", async () => {
+  const root = await fixtureRoot("clawpatch-cmake-nopreset-");
+  await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+  await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBeNull();
-    expect(project.detected.commands.test).toBeNull();
-  });
+  expect(project.detected.commands.typecheck).toBeNull();
+  expect(project.detected.commands.test).toBeNull();
+});
 
-  it("emits no C/C++ validation command for ambiguous CMake presets", async () => {
-    const root = await fixtureRoot("clawpatch-cmake-ambiguous-preset-");
-    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
-    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
-    await writeFixture(
-      root,
-      "CMakePresets.json",
-      JSON.stringify({
-        version: 6,
-        workflowPresets: [
-          { name: "debug", steps: [] },
-          { name: "release", steps: [] },
-        ],
-      }),
-    );
+it("emits no C/C++ validation command for ambiguous CMake presets", async () => {
+  const root = await fixtureRoot("clawpatch-cmake-ambiguous-preset-");
+  await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+  await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+  await writeFixture(
+    root,
+    "CMakePresets.json",
+    JSON.stringify({
+      version: 6,
+      workflowPresets: [
+        { name: "debug", steps: [] },
+        { name: "release", steps: [] },
+      ],
+    }),
+  );
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBeNull();
-  });
+  expect(project.detected.commands.typecheck).toBeNull();
+});
 
-  it("emits no C/C++ validation command for an autotools-only project", async () => {
-    const root = await fixtureRoot("clawpatch-autotools-nullcmd-");
-    await writeFixture(root, "Makefile.am", "bin_PROGRAMS = app\napp_SOURCES = main.c\n");
-    await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
+it("emits no C/C++ validation command for an autotools-only project", async () => {
+  const root = await fixtureRoot("clawpatch-autotools-nullcmd-");
+  await writeFixture(root, "Makefile.am", "bin_PROGRAMS = app\napp_SOURCES = main.c\n");
+  await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
 
-    const project = await detectProject(root);
+  const project = await detectProject(root);
 
-    expect(project.detected.commands.typecheck).toBeNull();
-    expect(project.detected.commands.test).toBeNull();
-  });
+  expect(project.detected.commands.typecheck).toBeNull();
+  expect(project.detected.commands.test).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify status**
@@ -526,6 +526,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Adds a new mapper module that groups C/C++/CUDA source files not owned by any build target into bounded review slices, and wires it into `cCppSeeds`.
 
 **Files:**
+
 - Modify: `src/mappers/grouping.ts` (export `chunkFiles`)
 - Create: `src/mappers/c-cpp-groups.ts`
 - Modify: `src/mappers/c-cpp.ts` (call the new module)
@@ -536,60 +537,52 @@ Adds a new mapper module that groups C/C++/CUDA source files not owned by any bu
 Add these three tests in `src/mapper.test.ts` after the Task 4 tests:
 
 ```ts
-  it("maps loose C++ sources with no build target as a source-group feature", async () => {
-    const root = await fixtureRoot("clawpatch-cpp-group-");
-    await writeFixture(root, "lib/parser.cpp", "int parse(void) { return 0; }\n");
-    await writeFixture(root, "lib/lexer.cpp", "int lex(void) { return 0; }\n");
+it("maps loose C++ sources with no build target as a source-group feature", async () => {
+  const root = await fixtureRoot("clawpatch-cpp-group-");
+  await writeFixture(root, "lib/parser.cpp", "int parse(void) { return 0; }\n");
+  await writeFixture(root, "lib/lexer.cpp", "int lex(void) { return 0; }\n");
 
-    const project = await detectProject(root);
-    const result = await mapFeatures(root, project, []);
-    const group = result.features.find((feature) => feature.title === "C/C++ source group lib");
+  const project = await detectProject(root);
+  const result = await mapFeatures(root, project, []);
+  const group = result.features.find((feature) => feature.title === "C/C++ source group lib");
 
-    expect(group?.kind).toBe("library");
-    expect(group?.source).toBe("c-cpp-group");
-    expect(group?.ownedFiles).toEqual([
-      { path: "lib/lexer.cpp", reason: "source group member" },
-      { path: "lib/parser.cpp", reason: "source group member" },
-    ]);
-  });
+  expect(group?.kind).toBe("library");
+  expect(group?.source).toBe("c-cpp-group");
+  expect(group?.ownedFiles).toEqual([
+    { path: "lib/lexer.cpp", reason: "source group member" },
+    { path: "lib/parser.cpp", reason: "source group member" },
+  ]);
+});
 
-  it("excludes files already owned by a CMake target from source groups", async () => {
-    const root = await fixtureRoot("clawpatch-cpp-group-exclude-");
-    await writeFixture(root, "CMakeLists.txt", "add_executable(app src/main.cpp)\n");
-    await writeFixture(root, "src/main.cpp", "int main(void) { return 0; }\n");
-    await writeFixture(root, "src/helper.cpp", "int help(void) { return 0; }\n");
+it("excludes files already owned by a CMake target from source groups", async () => {
+  const root = await fixtureRoot("clawpatch-cpp-group-exclude-");
+  await writeFixture(root, "CMakeLists.txt", "add_executable(app src/main.cpp)\n");
+  await writeFixture(root, "src/main.cpp", "int main(void) { return 0; }\n");
+  await writeFixture(root, "src/helper.cpp", "int help(void) { return 0; }\n");
 
-    const project = await detectProject(root);
-    const result = await mapFeatures(root, project, []);
-    const group = result.features.find((feature) => feature.title === "C/C++ source group src");
+  const project = await detectProject(root);
+  const result = await mapFeatures(root, project, []);
+  const group = result.features.find((feature) => feature.title === "C/C++ source group src");
 
-    expect(group?.ownedFiles).toEqual([
-      { path: "src/helper.cpp", reason: "source group member" },
-    ]);
-  });
+  expect(group?.ownedFiles).toEqual([{ path: "src/helper.cpp", reason: "source group member" }]);
+});
 
-  it("maps a loose CUDA kernel directory as a CUDA source group with concurrency", async () => {
-    const root = await fixtureRoot("clawpatch-cuda-group-");
-    await writeFixture(
-      root,
-      "kernels/reduce.cu",
-      "__global__ void reduce(float *x) { x[0] = 0; }\n",
-    );
-    await writeFixture(root, "kernels/reduce.cuh", "__global__ void reduce(float *x);\n");
+it("maps a loose CUDA kernel directory as a CUDA source group with concurrency", async () => {
+  const root = await fixtureRoot("clawpatch-cuda-group-");
+  await writeFixture(root, "kernels/reduce.cu", "__global__ void reduce(float *x) { x[0] = 0; }\n");
+  await writeFixture(root, "kernels/reduce.cuh", "__global__ void reduce(float *x);\n");
 
-    const project = await detectProject(root);
-    const result = await mapFeatures(root, project, []);
-    const group = result.features.find(
-      (feature) => feature.title === "CUDA source group kernels",
-    );
+  const project = await detectProject(root);
+  const result = await mapFeatures(root, project, []);
+  const group = result.features.find((feature) => feature.title === "CUDA source group kernels");
 
-    expect(group?.tags).toContain("cuda");
-    expect(group?.trustBoundaries).toContain("concurrency");
-    expect(group?.ownedFiles).toEqual([
-      { path: "kernels/reduce.cu", reason: "source group member" },
-      { path: "kernels/reduce.cuh", reason: "source group member" },
-    ]);
-  });
+  expect(group?.tags).toContain("cuda");
+  expect(group?.trustBoundaries).toContain("concurrency");
+  expect(group?.ownedFiles).toEqual([
+    { path: "kernels/reduce.cu", reason: "source group member" },
+    { path: "kernels/reduce.cuh", reason: "source group member" },
+  ]);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -684,22 +677,19 @@ import { cCppGroupSeeds } from "./c-cpp-groups.js";
 In the `cCppSeeds` function, replace these final two lines:
 
 ```ts
-  seeds.push(...(await mainFunctionTargets(root, files, alreadySeeded)));
-  return dedupeByEntry(seeds);
+seeds.push(...(await mainFunctionTargets(root, files, alreadySeeded)));
+return dedupeByEntry(seeds);
 ```
 
 with:
 
 ```ts
-  seeds.push(...(await mainFunctionTargets(root, files, alreadySeeded)));
-  const ownedPaths = new Set(
-    seeds.flatMap((seed) => [
-      seed.entryPath,
-      ...(seed.ownedFiles?.map((file) => file.path) ?? []),
-    ]),
-  );
-  seeds.push(...cCppGroupSeeds(files.filter(isCOrCppSource), ownedPaths));
-  return dedupeByEntry(seeds);
+seeds.push(...(await mainFunctionTargets(root, files, alreadySeeded)));
+const ownedPaths = new Set(
+  seeds.flatMap((seed) => [seed.entryPath, ...(seed.ownedFiles?.map((file) => file.path) ?? [])]),
+);
+seeds.push(...cCppGroupSeeds(files.filter(isCOrCppSource), ownedPaths));
+return dedupeByEntry(seeds);
 ```
 
 `ownedPaths` is built from every prior seed (autotools, cmake, cmake-test, and `c-main`), so source groups never double-own a file already covered by a build target.
@@ -732,6 +722,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 6: Documentation and final verification
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `docs/feature-mapping.md`
 - Modify: `CHANGELOG.md`

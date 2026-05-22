@@ -158,7 +158,11 @@ C/C++ mapping covers generic project shapes only: standalone source files with
 php-src extension metadata. CUDA `.cu` / `.cuh` files are mapped through the same
 C/C++ shapes, including the legacy `FindCUDA` `cuda_add_executable` /
 `cuda_add_library` commands; CUDA targets are tagged `cuda`, and a repository with
-`.cu` / `.cuh` sources is detected as a `cuda` project.
+`.cu` / `.cuh` sources is detected as a `cuda` project. Source files not owned by
+any build target are grouped per directory into bounded, low-confidence source
+groups. C/C++/CUDA validation commands are emitted only when the project declares
+them — a root `Makefile` `check`/`test` target, or a `CMakePresets.json` build
+workflow — and stay null otherwise.
 
 Python mapping covers `pyproject.toml`, `setup.cfg`, `setup.py`, and
 `requirements.txt` metadata; `[project.scripts]`, `[tool.poetry.scripts]`,

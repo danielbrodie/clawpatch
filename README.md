@@ -84,8 +84,9 @@ validation commands and records a patch attempt under `.clawpatch/`.
 - Rust `src/main.rs`, `src/bin/*.rs`, `src/lib.rs`, `crates/*`, and
   `tests/*.rs`
 - C/C++/CUDA standalone `main()` files, CMake `add_executable` / `add_library`
-  targets, and autotools `bin_PROGRAMS` / `lib_LTLIBRARIES` targets, including
-  CUDA `.cu` / `.cuh` sources
+  targets, autotools `bin_PROGRAMS` / `lib_LTLIBRARIES` targets, and residual
+  source groups for files outside any build target, including CUDA `.cu` /
+  `.cuh` sources
 - Python project metadata, console scripts, bounded source groups, pytest suites,
   and Flask/FastAPI/Django routes
 - SwiftPM `Sources/*` targets and `Tests/*` suites
