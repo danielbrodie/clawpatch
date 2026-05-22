@@ -1285,6 +1285,9 @@ async function detectLanguages(root: string): Promise<string[]> {
   if (!languages.includes("cpp") && (await containsCppFile(root))) {
     languages.push("cpp");
   }
+  if (!languages.includes("cuda") && (await containsCudaFile(root))) {
+    languages.push("cuda");
+  }
   if (!languages.includes("php") && (await containsReviewablePhpFile(root))) {
     languages.push("php");
   }
@@ -1337,6 +1340,13 @@ async function containsReviewableCsharpFile(root: string): Promise<boolean> {
 
 async function containsCFile(root: string): Promise<boolean> {
   return containsFileWithExtension(root, ".c", 5, shouldSkipCOrCppSearchEntry);
+}
+
+async function containsCudaFile(root: string): Promise<boolean> {
+  return (
+    (await containsFileWithExtensionIgnoringCase(root, ".cu", 5, shouldSkipCOrCppSearchEntry)) ||
+    (await containsFileWithExtensionIgnoringCase(root, ".cuh", 5, shouldSkipCOrCppSearchEntry))
+  );
 }
 
 async function containsCppFile(root: string): Promise<boolean> {

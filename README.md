@@ -83,8 +83,9 @@ validation commands and records a patch attempt under `.clawpatch/`.
   Ecto migrations, project scripts, and ExUnit suites
 - Rust `src/main.rs`, `src/bin/*.rs`, `src/lib.rs`, `crates/*`, and
   `tests/*.rs`
-- C/C++ standalone `main()` files, CMake `add_executable` / `add_library`
-  targets, and autotools `bin_PROGRAMS` / `lib_LTLIBRARIES` targets
+- C/C++/CUDA standalone `main()` files, CMake `add_executable` / `add_library`
+  targets, and autotools `bin_PROGRAMS` / `lib_LTLIBRARIES` targets, including
+  CUDA `.cu` / `.cuh` sources
 - Python project metadata, console scripts, bounded source groups, pytest suites,
   and Flask/FastAPI/Django routes
 - SwiftPM `Sources/*` targets and `Tests/*` suites

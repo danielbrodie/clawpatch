@@ -11786,6 +11786,90 @@ add_executable(headerapp include/headers.hpp)
     ]);
   });
 
+  it("maps a standalone CUDA source file with main as a CUDA binary", async () => {
+    const root = await fixtureRoot("clawpatch-cuda-standalone-");
+    await writeFixture(
+      root,
+      "saxpy.cu",
+      "__global__ void saxpy(float *x) { x[threadIdx.x] *= 2.0f; }\nint main(void) { return 0; }\n",
+    );
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const saxpy = result.features.find((feature) => feature.title === "CUDA binary saxpy");
+
+    expect(saxpy?.source).toBe("c-main");
+    expect(saxpy?.entrypoints[0]).toMatchObject({ path: "saxpy.cu", symbol: "main" });
+    expect(saxpy?.tags).toContain("cuda");
+  });
+
+  it("maps CMake CUDA targets including .cu and .cuh sources", async () => {
+    const root = await fixtureRoot("clawpatch-cmake-cuda-");
+    await writeFixture(
+      root,
+      "CMakeLists.txt",
+      "project(gpuapp CUDA)\nadd_executable(gpuapp src/main.cu src/kernels.cu src/kernels.cuh)\n",
+    );
+    await writeFixture(root, "src/main.cu", "int main(void) { return 0; }\n");
+    await writeFixture(
+      root,
+      "src/kernels.cu",
+      "__global__ void scale(float *x) { x[0] = 1.0f; }\n",
+    );
+    await writeFixture(root, "src/kernels.cuh", "__global__ void scale(float *x);\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const gpuapp = result.features.find((feature) => feature.title === "CMake binary gpuapp");
+
+    expect(gpuapp?.entrypoints[0]).toMatchObject({ path: "src/main.cu", symbol: "main" });
+    expect(gpuapp?.tags).toContain("cuda");
+    expect(gpuapp?.ownedFiles).toEqual([
+      { path: "src/main.cu", reason: "target source" },
+      { path: "src/kernels.cu", reason: "target source" },
+      { path: "src/kernels.cuh", reason: "target source" },
+    ]);
+  });
+
+  it("maps legacy FindCUDA cuda_add_executable and cuda_add_library targets", async () => {
+    const root = await fixtureRoot("clawpatch-cmake-find-cuda-");
+    await writeFixture(
+      root,
+      "CMakeLists.txt",
+      "find_package(CUDA REQUIRED)\ncuda_add_executable(gpuapp src/main.cu)\ncuda_add_library(gpukernels src/kernels.cu)\n",
+    );
+    await writeFixture(root, "src/main.cu", "int main(void) { return 0; }\n");
+    await writeFixture(
+      root,
+      "src/kernels.cu",
+      "__global__ void scale(float *x) { x[0] = 1.0f; }\n",
+    );
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const titles = result.features.map((feature) => feature.title);
+    const gpuapp = result.features.find((feature) => feature.title === "CMake binary gpuapp");
+    const gpukernels = result.features.find(
+      (feature) => feature.title === "CMake library gpukernels",
+    );
+
+    expect(titles).toContain("CMake binary gpuapp");
+    expect(titles).toContain("CMake library gpukernels");
+    expect(gpuapp?.entrypoints[0]).toMatchObject({ path: "src/main.cu", symbol: "main" });
+    expect(gpuapp?.tags).toContain("cuda");
+    expect(gpuapp?.summary).toContain("cuda_add_executable");
+    expect(gpukernels?.ownedFiles).toEqual([{ path: "src/kernels.cu", reason: "target source" }]);
+  });
+
+  it("detects CUDA projects from .cu sources", async () => {
+    const root = await fixtureRoot("clawpatch-cuda-detect-");
+    await writeFixture(root, "src/kernel.cu", "__global__ void noop(void) {}\n");
+
+    const project = await detectProject(root);
+
+    expect(project.detected.languages).toContain("cuda");
+  });
+
   it("maps autotools targets from Makefile.in", async () => {
     const root = await fixtureRoot("clawpatch-autotools-makefile-in-");
     await writeFixture(

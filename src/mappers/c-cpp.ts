@@ -33,11 +33,11 @@ export async function cCppSeeds(root: string): Promise<FeatureSeed[]> {
 }
 
 function isCOrCppSource(path: string): boolean {
-  return /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx)$/iu.test(path);
+  return /\.(?:c|cc|cpp|cxx|cu|cuh|h|hh|hpp|hxx)$/iu.test(path);
 }
 
 function isCOrCppCompilable(path: string): boolean {
-  return /\.(?:c|cc|cpp|cxx)$/iu.test(path);
+  return /\.(?:c|cc|cpp|cxx|cu)$/iu.test(path);
 }
 
 function isMakefile(path: string): boolean {
@@ -48,8 +48,17 @@ function isCMake(path: string): boolean {
   return path.endsWith("CMakeLists.txt") || path.endsWith(".cmake");
 }
 
-function languageTag(path: string): "c" | "cpp" {
+type LanguageTag = "c" | "cpp" | "cuda";
+
+function languageTag(path: string): LanguageTag {
+  if (/\.cuh?$/iu.test(path)) {
+    return "cuda";
+  }
   return /\.(?:C|H)$/u.test(path) || /\.(?:cc|cpp|cxx|hh|hpp|hxx)$/iu.test(path) ? "cpp" : "c";
+}
+
+function languageLabel(tag: LanguageTag): string {
+  return tag === "cuda" ? "CUDA" : tag === "cpp" ? "C++" : "C";
 }
 
 async function autotoolsTargets(root: string, files: string[]): Promise<FeatureSeed[]> {
@@ -139,7 +148,10 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
     const body = stripCMakeComments(await readFile(join(root, cmakeFile), "utf8").catch(() => ""));
     const effectiveProjectSourceDir = cmakeDeclaresProject(body) ? dir : projectSourceDir;
     const effectiveProjectName = cmakeProjectName(body) ?? projectName;
-    for (const args of cmakeCommandArgs(body, "add_executable")) {
+    for (const { command, args } of cmakeTargetCalls(body, [
+      "add_executable",
+      "cuda_add_executable",
+    ])) {
       const [rawTarget = "", ...sources] = splitWords(args);
       const target = resolveCMakeTargetName(rawTarget, effectiveProjectName);
       if (!isValidTargetName(target)) {
@@ -197,7 +209,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
       const tag = languageTag(entryPath);
       seeds.push({
         title: `CMake binary ${target}`,
-        summary: `CMake add_executable(${target}) declared in ${cmakeFile}.`,
+        summary: `CMake ${command}(${target}) declared in ${cmakeFile}.`,
         kind: "cli-command",
         source: "cmake-bin",
         confidence: "high",
@@ -211,7 +223,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
         contextFiles,
       });
     }
-    for (const args of cmakeCommandArgs(body, "add_library")) {
+    for (const { command, args } of cmakeTargetCalls(body, ["add_library", "cuda_add_library"])) {
       const [rawTarget = "", ...sources] = splitWords(args);
       const target = resolveCMakeTargetName(rawTarget, effectiveProjectName);
       if (!isValidTargetName(target)) {
@@ -236,7 +248,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
       const tag = languageTag(entryPath);
       seeds.push({
         title: `CMake library ${target}`,
-        summary: `CMake add_library(${target}) declared in ${cmakeFile}.`,
+        summary: `CMake ${command}(${target}) declared in ${cmakeFile}.`,
         kind: "library",
         source: "cmake-lib",
         confidence: "high",
@@ -515,6 +527,15 @@ function cmakeSubdirectories(body: string): string[] {
   return directories;
 }
 
+function cmakeTargetCalls(
+  body: string,
+  commands: string[],
+): Array<{ command: string; args: string }> {
+  return commands.flatMap((command) =>
+    cmakeCommandArgs(body, command).map((args) => ({ command, args })),
+  );
+}
+
 function cmakeCommandArgs(body: string, command: string): string[] {
   const args: string[] = [];
   const needle = command.toLowerCase();
@@ -660,8 +681,8 @@ async function mainFunctionTargets(
         .at(-1)
         ?.replace(/\.[^.]+$/u, "") ?? "main";
     seeds.push({
-      title: `${tag === "cpp" ? "C++" : "C"} binary ${command}`,
-      summary: `C/C++ source file with a top-level main() at ${file}.`,
+      title: `${languageLabel(tag)} binary ${command}`,
+      summary: `${tag === "cuda" ? "CUDA" : "C/C++"} source file with a top-level main() at ${file}.`,
       kind: "cli-command",
       source: "c-main",
       confidence: "medium",
