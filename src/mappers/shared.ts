@@ -405,6 +405,29 @@ export function isCOrCppTestPath(path: string): boolean {
   );
 }
 
+export type LanguageTag = "c" | "cpp" | "cuda";
+
+export function languageTag(path: string): LanguageTag {
+  if (/\.cuh?$/iu.test(path)) {
+    return "cuda";
+  }
+  return /\.(?:C|H)$/u.test(path) || /\.(?:cc|cpp|cxx|hh|hpp|hxx)$/iu.test(path) ? "cpp" : "c";
+}
+
+export function languageLabel(tag: LanguageTag): string {
+  return tag === "cuda" ? "CUDA" : tag === "cpp" ? "C++" : "C";
+}
+
+export function withCudaConcurrency(
+  boundaries: TrustBoundary[],
+  tag: LanguageTag,
+): TrustBoundary[] {
+  if (tag !== "cuda" || boundaries.includes("concurrency")) {
+    return boundaries;
+  }
+  return [...boundaries, "concurrency"];
+}
+
 function shouldSkipCOrCppNearbyPath(path: string): boolean {
   return shouldSkip(path) || isCOrCppDependencyPath(path) || isSampleProjectPath(path);
 }

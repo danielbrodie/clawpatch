@@ -4,11 +4,14 @@ import {
   isSafeFile,
   isCOrCppTestPath,
   isSampleProjectPath,
+  languageLabel,
+  languageTag,
   normalize,
   packageTrustBoundaries,
   shouldSkip,
   stripLineComments,
   walk,
+  withCudaConcurrency,
 } from "./shared.js";
 import { FeatureSeed, SeedFileRef } from "./types.js";
 
@@ -48,19 +51,6 @@ function isCMake(path: string): boolean {
   return path.endsWith("CMakeLists.txt") || path.endsWith(".cmake");
 }
 
-type LanguageTag = "c" | "cpp" | "cuda";
-
-function languageTag(path: string): LanguageTag {
-  if (/\.cuh?$/iu.test(path)) {
-    return "cuda";
-  }
-  return /\.(?:C|H)$/u.test(path) || /\.(?:cc|cpp|cxx|hh|hpp|hxx)$/iu.test(path) ? "cpp" : "c";
-}
-
-function languageLabel(tag: LanguageTag): string {
-  return tag === "cuda" ? "CUDA" : tag === "cpp" ? "C++" : "C";
-}
-
 async function autotoolsTargets(root: string, files: string[]): Promise<FeatureSeed[]> {
   const seeds: FeatureSeed[] = [];
   const makefiles = files.filter(isMakefile);
@@ -95,7 +85,7 @@ async function autotoolsTargets(root: string, files: string[]): Promise<FeatureS
         route: null,
         command: target,
         tags: [tag, "cli"],
-        trustBoundaries: ["user-input", "filesystem", "process-exec"],
+        trustBoundaries: withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag),
         ownedFiles: targetSourceRefs(sourcePaths),
         contextFiles: [{ path: makefile, reason: "build target declaration" }],
       });
@@ -123,7 +113,7 @@ async function autotoolsTargets(root: string, files: string[]): Promise<FeatureS
         route: null,
         command: null,
         tags: [tag, "library"],
-        trustBoundaries: packageTrustBoundaries(target),
+        trustBoundaries: withCudaConcurrency(packageTrustBoundaries(target), tag),
         ownedFiles: targetSourceRefs(sourcePaths),
         contextFiles: [{ path: makefile, reason: "build target declaration" }],
       });
@@ -194,7 +184,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
           route: null,
           command: null,
           tags: [languageTag(testEntryPath), "test"],
-          trustBoundaries: [],
+          trustBoundaries: withCudaConcurrency([], languageTag(testEntryPath)),
           ownedFiles: targetSourceRefs(sourcePaths),
           contextFiles: cmakeTargetContextFiles(
             cmakeFile,
@@ -218,7 +208,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
         route: null,
         command: target,
         tags: [tag, "cli"],
-        trustBoundaries: ["user-input", "filesystem", "process-exec"],
+        trustBoundaries: withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag),
         ownedFiles: targetSourceRefs(sourcePaths),
         contextFiles,
       });
@@ -257,7 +247,7 @@ async function cmakeTargets(root: string, files: string[]): Promise<FeatureSeed[
         route: null,
         command: null,
         tags: [tag, "library"],
-        trustBoundaries: packageTrustBoundaries(target),
+        trustBoundaries: withCudaConcurrency(packageTrustBoundaries(target), tag),
         ownedFiles: targetSourceRefs(sourcePaths),
         contextFiles: cmakeTargetContextFiles(cmakeFile, "CMake target declaration", extraSources),
       });
@@ -691,7 +681,7 @@ async function mainFunctionTargets(
       route: null,
       command,
       tags: [tag, "cli"],
-      trustBoundaries: ["user-input", "filesystem", "process-exec"],
+      trustBoundaries: withCudaConcurrency(["user-input", "filesystem", "process-exec"], tag),
     });
   }
   return seeds;

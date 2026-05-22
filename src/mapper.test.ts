@@ -11870,6 +11870,22 @@ add_executable(headerapp include/headers.hpp)
     expect(project.detected.languages).toContain("cuda");
   });
 
+  it("tags CUDA build targets with the concurrency trust boundary", async () => {
+    const root = await fixtureRoot("clawpatch-cuda-concurrency-");
+    await writeFixture(
+      root,
+      "CMakeLists.txt",
+      "project(gpuapp CUDA)\nadd_executable(gpuapp src/main.cu)\n",
+    );
+    await writeFixture(root, "src/main.cu", "int main(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const gpuapp = result.features.find((feature) => feature.title === "CMake binary gpuapp");
+
+    expect(gpuapp?.trustBoundaries).toContain("concurrency");
+  });
+
   it("maps autotools targets from Makefile.in", async () => {
     const root = await fixtureRoot("clawpatch-autotools-makefile-in-");
     await writeFixture(
