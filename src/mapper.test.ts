@@ -11924,6 +11924,64 @@ add_executable(headerapp include/headers.hpp)
     expect(project.detected.commands.test).toBeNull();
   });
 
+  it("emits a CMake workflow preset validation command when one is declared", async () => {
+    const root = await fixtureRoot("clawpatch-cmake-preset-");
+    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+    await writeFixture(
+      root,
+      "CMakePresets.json",
+      JSON.stringify({ version: 6, workflowPresets: [{ name: "default", steps: [] }] }),
+    );
+
+    const project = await detectProject(root);
+
+    expect(project.detected.commands.typecheck).toBe("cmake --workflow --preset default");
+  });
+
+  it("emits no C/C++ validation command for a CMake project without presets", async () => {
+    const root = await fixtureRoot("clawpatch-cmake-nopreset-");
+    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+
+    expect(project.detected.commands.typecheck).toBeNull();
+    expect(project.detected.commands.test).toBeNull();
+  });
+
+  it("emits no C/C++ validation command for ambiguous CMake presets", async () => {
+    const root = await fixtureRoot("clawpatch-cmake-ambiguous-preset-");
+    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+    await writeFixture(
+      root,
+      "CMakePresets.json",
+      JSON.stringify({
+        version: 6,
+        workflowPresets: [
+          { name: "debug", steps: [] },
+          { name: "release", steps: [] },
+        ],
+      }),
+    );
+
+    const project = await detectProject(root);
+
+    expect(project.detected.commands.typecheck).toBeNull();
+  });
+
+  it("emits no C/C++ validation command for an autotools-only project", async () => {
+    const root = await fixtureRoot("clawpatch-autotools-nullcmd-");
+    await writeFixture(root, "Makefile.am", "bin_PROGRAMS = app\napp_SOURCES = main.c\n");
+    await writeFixture(root, "main.c", "int main(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+
+    expect(project.detected.commands.typecheck).toBeNull();
+    expect(project.detected.commands.test).toBeNull();
+  });
+
   it("maps autotools targets from Makefile.in", async () => {
     const root = await fixtureRoot("clawpatch-autotools-makefile-in-");
     await writeFixture(

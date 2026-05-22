@@ -699,6 +699,10 @@ async function cOrCppDefaultCommands(root: string): Promise<ProjectCommands> {
   if (makefileCommands !== null) {
     return makefileCommands;
   }
+  const presetCommands = await cmakePresetDefaultCommands(root);
+  if (presetCommands !== null) {
+    return presetCommands;
+  }
   return { typecheck: null, lint: null, format: null, test: null };
 }
 
@@ -717,6 +721,87 @@ async function makefileDefaultCommands(root: string): Promise<ProjectCommands | 
 
 function makefileHasTarget(source: string, target: string): boolean {
   return new RegExp(`^${target}\\s*:(?!=)`, "mu").test(source);
+}
+
+type CMakePresetSets = {
+  workflowPresets: string[];
+  configurePresets: string[];
+  buildPresets: string[];
+  testPresets: string[];
+};
+
+async function cmakePresetDefaultCommands(root: string): Promise<ProjectCommands | null> {
+  if (!(await pathExists(join(root, "CMakePresets.json")))) {
+    return null;
+  }
+  const presets = await readCMakePresets(root);
+  if (presets === null) {
+    return null;
+  }
+  const testPreset = singlePresetName(presets.testPresets);
+  return {
+    typecheck: cmakeBuildCommand(presets),
+    lint: null,
+    format: null,
+    test: testPreset === null ? null : `ctest --preset ${testPreset}`,
+  };
+}
+
+function cmakeBuildCommand(presets: CMakePresetSets): string | null {
+  const workflow = singlePresetName(presets.workflowPresets);
+  if (workflow !== null) {
+    return `cmake --workflow --preset ${workflow}`;
+  }
+  const configure = singlePresetName(presets.configurePresets);
+  const build = singlePresetName(presets.buildPresets);
+  if (configure !== null && build !== null) {
+    return `cmake --preset ${configure} && cmake --build --preset ${build}`;
+  }
+  return null;
+}
+
+function singlePresetName(names: string[]): string | null {
+  return names.length === 1 ? (names[0] ?? null) : null;
+}
+
+async function readCMakePresets(root: string): Promise<CMakePresetSets | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(join(root, "CMakePresets.json"), "utf8"));
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+  const record = parsed as Record<string, unknown>;
+  return {
+    workflowPresets: cmakePresetNames(record["workflowPresets"]),
+    configurePresets: cmakePresetNames(record["configurePresets"]),
+    buildPresets: cmakePresetNames(record["buildPresets"]),
+    testPresets: cmakePresetNames(record["testPresets"]),
+  };
+}
+
+function cmakePresetNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const names: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const preset = entry as { name?: unknown; hidden?: unknown };
+    if (
+      typeof preset.name === "string" &&
+      preset.hidden !== true &&
+      /^[A-Za-z0-9._-]+$/u.test(preset.name)
+    ) {
+      names.push(preset.name);
+    }
+  }
+  return names;
 }
 
 async function mixProjectInfo(root: string): Promise<MixProjectInfo> {
