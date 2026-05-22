@@ -21,6 +21,7 @@
 Adds the `featureIncludesCuda` and `cudaGuidance` helpers and injects the guidance into `buildReviewPromptBundle`.
 
 **Files:**
+
 - Modify: `src/prompt.ts`
 - Test: `src/prompt.test.ts`
 
@@ -91,7 +92,12 @@ describe("CUDA prompt guidance", () => {
       ],
       contextFiles: [],
     };
-    const bundle = await buildReviewPromptBundle(root, project(root), mixedFeature, defaultConfig());
+    const bundle = await buildReviewPromptBundle(
+      root,
+      project(root),
+      mixedFeature,
+      defaultConfig(),
+    );
 
     expect(bundle.prompt).toContain("CUDA hazards");
   });
@@ -188,6 +194,7 @@ Expected: all four `CUDA prompt guidance` review tests PASS. All pre-existing te
 - [ ] **Step 7: Typecheck, lint, format**
 
 Run each; all must be clean:
+
 ```bash
 npx --yes pnpm@latest exec tsc -p tsconfig.json --noEmit
 npx --yes pnpm@latest exec oxlint . --config oxlint.json
@@ -214,6 +221,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Injects the same `cudaGuidance()` into `buildFixPrompt`. Reuses the `featureIncludesCuda` and `cudaGuidance` helpers added in Task 1.
 
 **Files:**
+
 - Modify: `src/prompt.ts`
 - Test: `src/prompt.test.ts`
 
@@ -222,38 +230,33 @@ Injects the same `cudaGuidance()` into `buildFixPrompt`. Reuses the `featureIncl
 In `src/prompt.test.ts`, add these two tests inside the `describe("CUDA prompt guidance", …)` block created in Task 1 — immediately before that block's closing `});`:
 
 ```ts
-  it("includes CUDA guidance in the fix prompt for a CUDA feature", async () => {
-    const root = await fixtureRoot("clawpatch-prompt-cuda-fix-");
-    await writeFixture(root, "src/kernel.cu", "__global__ void k(void) {}\n");
-    const cudaFeature: FeatureRecord = {
-      ...feature(),
-      entrypoints: [],
-      ownedFiles: [{ path: "src/kernel.cu", reason: "kernel" }],
-      contextFiles: [],
-    };
-    const prompt = await buildFixPrompt(
-      root,
-      finding("src/kernel.cu"),
-      cudaFeature,
-      defaultConfig(),
-    );
+it("includes CUDA guidance in the fix prompt for a CUDA feature", async () => {
+  const root = await fixtureRoot("clawpatch-prompt-cuda-fix-");
+  await writeFixture(root, "src/kernel.cu", "__global__ void k(void) {}\n");
+  const cudaFeature: FeatureRecord = {
+    ...feature(),
+    entrypoints: [],
+    ownedFiles: [{ path: "src/kernel.cu", reason: "kernel" }],
+    contextFiles: [],
+  };
+  const prompt = await buildFixPrompt(root, finding("src/kernel.cu"), cudaFeature, defaultConfig());
 
-    expect(prompt).toContain("CUDA hazards");
-  });
+  expect(prompt).toContain("CUDA hazards");
+});
 
-  it("omits CUDA guidance in the fix prompt for a non-CUDA feature", async () => {
-    const root = await fixtureRoot("clawpatch-prompt-noncuda-fix-");
-    await writeFixture(root, "src/index.ts", "export const value = 1;\n");
-    const tsFeature: FeatureRecord = {
-      ...feature(),
-      entrypoints: [],
-      ownedFiles: [{ path: "src/index.ts", reason: "primary" }],
-      contextFiles: [],
-    };
-    const prompt = await buildFixPrompt(root, finding("src/index.ts"), tsFeature, defaultConfig());
+it("omits CUDA guidance in the fix prompt for a non-CUDA feature", async () => {
+  const root = await fixtureRoot("clawpatch-prompt-noncuda-fix-");
+  await writeFixture(root, "src/index.ts", "export const value = 1;\n");
+  const tsFeature: FeatureRecord = {
+    ...feature(),
+    entrypoints: [],
+    ownedFiles: [{ path: "src/index.ts", reason: "primary" }],
+    contextFiles: [],
+  };
+  const prompt = await buildFixPrompt(root, finding("src/index.ts"), tsFeature, defaultConfig());
 
-    expect(prompt).not.toContain("CUDA hazards");
-  });
+  expect(prompt).not.toContain("CUDA hazards");
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify status**
@@ -312,6 +315,7 @@ Expected: both new fix-prompt tests PASS. All other tests pass.
 - [ ] **Step 6: Typecheck, lint, format**
 
 Run each; all must be clean:
+
 ```bash
 npx --yes pnpm@latest exec tsc -p tsconfig.json --noEmit
 npx --yes pnpm@latest exec oxlint . --config oxlint.json
@@ -335,6 +339,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 3: Documentation and final verification
 
 **Files:**
+
 - Modify: `docs/code-review.md`
 - Modify: `CHANGELOG.md`
 

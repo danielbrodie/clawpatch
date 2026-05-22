@@ -6,6 +6,7 @@
 - Added residual C/C++/CUDA source-group mapping so source files outside any CMake/autotools/`main()` target are grouped per directory into bounded review slices.
 - Added conservative C/C++/CUDA validation command defaults from a root `Makefile` `check`/`test` target or a declared `CMakePresets.json` build workflow, and mapped `CMakeLists.txt`, `CMakePresets.json`, and `configure.ac` as config features.
 - Added the `concurrency` trust boundary to CUDA build targets and source groups.
+- Made `clawpatch review` and `clawpatch fix` CUDA-aware by injecting CUDA-specific reviewer guidance (kernel races, unchecked CUDA runtime calls, host/device pointer confusion, memory-access hazards, synchronization mistakes) into the prompt for features that own `.cu` / `.cuh` sources.
 
 ## 0.4.0 - 2026-05-22
 

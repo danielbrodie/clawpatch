@@ -21,7 +21,7 @@ races, unchecked CUDA runtime calls, host/device pointer confusion, memory-acces
 hazards, or synchronization mistakes. The same is true of `buildFixPrompt` —
 clawpatch patches a CUDA finding with no CUDA awareness.
 
-So clawpatch can map a CUDA repository but cannot evaluate it *as CUDA*. Closing
+So clawpatch can map a CUDA repository but cannot evaluate it _as CUDA_. Closing
 that gap is the readiness bar before contributing upstream.
 
 ## Decisions taken during brainstorming
@@ -34,7 +34,7 @@ that gap is the readiness bar before contributing upstream.
   is in a `.cpp` but which compiles `.cu` kernels is tagged `cpp`, yet still needs
   CUDA review — the extension check catches it; the tag would not.
 - **Review guidance is gated to `default` mode.** `deslopify` mode instructs the
-  model to report only simplification findings and explicitly *not* hunt bugs;
+  model to report only simplification findings and explicitly _not_ hunt bugs;
   injecting CUDA bug guidance there would contradict it.
 - **No finding-schema change.** CUDA bug classes map onto the existing `category`
   enum (`concurrency`, `bug`, `data-loss`, `performance`). The guidance steers to
@@ -89,8 +89,7 @@ Build a `cudaBlock` string and interpolate `${cudaBlock}` into the prompt
 template immediately after the existing `${reviewModeInstructions(mode)}`:
 
 ```ts
-const cudaBlock =
-  mode === "default" && featureIncludesCuda(feature) ? `\n${cudaGuidance()}\n` : "";
+const cudaBlock = mode === "default" && featureIncludesCuda(feature) ? `\n${cudaGuidance()}\n` : "";
 ```
 
 When the feature is not CUDA, or the mode is `deslopify`, `cudaBlock` is the
