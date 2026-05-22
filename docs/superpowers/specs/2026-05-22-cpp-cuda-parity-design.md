@@ -33,9 +33,10 @@ missing the capabilities that make a language feel first-class:
   C/C++ base, not a CUDA-specific veneer.
 - **Decomposition:** two specs. This one (Spec 1) closes the coverage and
   operational gaps. Spec 2 (later) adds CUDA semantic depth.
-- **Validation commands:** conservative, build-focused — emit a build/compile
-  command only on an unambiguous signal; emit `test` only when a clear test
-  target exists; ambiguous cases stay `null`, matching the .NET/Swift stance.
+- **Validation commands:** conservative — clawpatch emits a command only when
+  the project itself declares it: a `Makefile` `check`/`test` target, or a
+  `CMakePresets.json` build workflow. No declared workflow → `null`, matching
+  the .NET/autotools stance. No build command is ever invented.
 - **Structure:** the new source-group logic lives in a sibling module, not
   inside the already-largest mapper file.
 
@@ -87,25 +88,33 @@ delegating to a `cOrCppDefaultCommands(root)` helper:
 - **Root plain `Makefile` present** → `typecheck: "make"`; `test: "make check"`
   if the Makefile declares a `check:` target, else `"make test"` if it declares
   a `test:` target, else `null`.
-- **Else root `CMakeLists.txt` that declares `project(`** →
-  `typecheck: "cmake -B build && cmake --build build"`;
-  `test: "ctest --test-dir build"` only if the file declares testing
-  (`enable_testing(`, `include(CTest)`, or `add_test(`), else `null`.
-- **Otherwise** (autotools-only `Makefile.am`/`Makefile.in` with no generated
-  `Makefile`, or no clear build root) → all `null`.
+- **Else a root `CMakePresets.json`** declaring an unambiguous build workflow:
+  - exactly one `workflowPresets` entry → `typecheck:
+    "cmake --workflow --preset <name>"`;
+  - else exactly one `configurePresets` entry **and** one `buildPresets` entry →
+    `typecheck: "cmake --preset <cfg> && cmake --build --preset <build>"`;
+  - exactly one `testPresets` entry → `test: "ctest --preset <name>"`;
+  - anything ambiguous (multiple competing presets, or none of the above) →
+    `null`. `CMakeUserPresets.json` is ignored — it is a user-local, typically
+    gitignored file and must not drive a shared command.
+- **Otherwise** (a `CMakeLists.txt` with no `CMakePresets.json`, autotools-only
+  `Makefile.am`/`Makefile.in`, or no clear build root) → all `null`.
 - `lint` and `format` → always `null` for Spec 1. Project-wide C/C++
   lint/format has no reliable invocation without a compile database; deferred.
 
-Detection of build-file contents uses simple regex matching on the raw file
-(a commented-out `project()`/`check:` is an accepted edge case). First-match-wins
-in `languageDefaultCommands` is unchanged: a polyglot repo (e.g. Rust + some C)
-keeps the higher-priority language's commands.
+clawpatch never invents a CMake invocation — it emits one only when the project
+declares the workflow itself, the same rule it already applies to `package.json`
+scripts and Nx/Turbo targets. The `Makefile` target check is a regex on the raw
+file (a commented-out `check:` is an accepted edge case); `CMakePresets.json` is
+parsed as JSON. First-match-wins in `languageDefaultCommands` is unchanged: a
+polyglot repo (e.g. Rust + some C) keeps the higher-priority language's
+commands.
 
 ### 3. `CMakeLists.txt` config feature — `config.ts`
 
-Add `"CMakeLists.txt"` and `"configure.ac"` to the config mapper's `candidates`
-list. Like `Cargo.toml`, these are matched at the repository root only. Build
-files become reviewable `config` features.
+Add `"CMakeLists.txt"`, `"CMakePresets.json"`, and `"configure.ac"` to the
+config mapper's `candidates` list. Like `Cargo.toml`, these are matched at the
+repository root only. Build files become reviewable `config` features.
 
 ### 4. CUDA `concurrency` trust boundary — `c-cpp.ts`
 
@@ -140,11 +149,11 @@ tests:
    tagged `cuda` with a `concurrency` trust boundary.
 4. A root `Makefile` with a `check:` target →
    `detected.commands.typecheck === "make"`, `test === "make check"`.
-5. A root `CMakeLists.txt` with `project()` and `enable_testing()` →
-   `typecheck === "cmake -B build && cmake --build build"`,
-   `test === "ctest --test-dir build"`.
-6. A root `CMakeLists.txt` with `project()` but no testing declared →
-   `test === null`.
+5. A root `CMakePresets.json` with one `workflowPresets` entry →
+   `detected.commands.typecheck === "cmake --workflow --preset <name>"`.
+6. A root `CMakeLists.txt` with `project()` but no `CMakePresets.json` (and no
+   root `Makefile`) → C/C++ validation commands all `null`; likewise a
+   `CMakePresets.json` with multiple competing presets → `null`.
 7. An autotools-only repo (`Makefile.am`, no `Makefile`) → C/C++ validation
    commands all `null`.
 8. A root `CMakeLists.txt` produces a `"Project config CMakeLists.txt"` feature.
@@ -155,11 +164,19 @@ pass.
 
 ## Risks
 
-- **Noisy source groups.** `low` confidence and the 12-file bound mitigate; a
-  large C/C++ repo will still gain many group features. Accepted.
-- **CMake `typecheck` runs a configure step** that creates `build/`; in a bare
-  environment `fix`/`revalidate` may see it fail. Accepted — a root
-  `CMakeLists.txt` was chosen as a clear-enough signal.
+- **Source-group volume is structural, not a defect.** Groups are residual-only
+  — they cover only files no CMake/autotools/`main()` target already owns — so
+  group count scales inversely with build-file quality and is near zero in a
+  well-structured repo. Each group is bounded at 12 files and split by
+  directory/filename family by `partitionFileGroups`, the same shape Node, JVM,
+  and .NET groups already ship. `confidence: "low"` labels them honestly. No
+  extra gate is warranted.
+- **No invented build commands.** CMake commands come only from a project's own
+  `CMakePresets.json`; a preset's configured `binaryDir` is generated by the
+  project's declared workflow, not by a command clawpatch guessed, and
+  clawpatch's `shouldSkip` already ignores `build`-named directories. A project
+  with no declared workflow gets `null` — the honest result, and never a flaky
+  invented configure step.
 
 ## Out of scope — Spec 2
 
