@@ -13,6 +13,7 @@ import {
   walk,
   withCudaConcurrency,
 } from "./shared.js";
+import { cCppGroupSeeds } from "./c-cpp-groups.js";
 import { FeatureSeed, SeedFileRef } from "./types.js";
 
 export async function cCppSeeds(root: string): Promise<FeatureSeed[]> {
@@ -32,6 +33,10 @@ export async function cCppSeeds(root: string): Promise<FeatureSeed[]> {
       .flatMap((seed) => [seed.entryPath, ...(seed.ownedFiles?.map((file) => file.path) ?? [])]),
   );
   seeds.push(...(await mainFunctionTargets(root, files, alreadySeeded)));
+  const ownedPaths = new Set(
+    seeds.flatMap((seed) => [seed.entryPath, ...(seed.ownedFiles?.map((file) => file.path) ?? [])]),
+  );
+  seeds.push(...cCppGroupSeeds(files.filter(isCOrCppSource), ownedPaths));
   return dedupeByEntry(seeds);
 }
 

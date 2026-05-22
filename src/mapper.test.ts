@@ -11971,6 +11971,57 @@ add_executable(headerapp include/headers.hpp)
     expect(project.detected.commands.typecheck).toBeNull();
   });
 
+  it("maps loose C++ sources with no build target as a source-group feature", async () => {
+    const root = await fixtureRoot("clawpatch-cpp-group-");
+    await writeFixture(root, "lib/parser.cpp", "int parse(void) { return 0; }\n");
+    await writeFixture(root, "lib/lexer.cpp", "int lex(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const group = result.features.find((feature) => feature.title === "C/C++ source group lib");
+
+    expect(group?.kind).toBe("library");
+    expect(group?.source).toBe("c-cpp-group");
+    expect(group?.ownedFiles).toEqual([
+      { path: "lib/lexer.cpp", reason: "source group member" },
+      { path: "lib/parser.cpp", reason: "source group member" },
+    ]);
+  });
+
+  it("excludes files already owned by a CMake target from source groups", async () => {
+    const root = await fixtureRoot("clawpatch-cpp-group-exclude-");
+    await writeFixture(root, "CMakeLists.txt", "add_executable(app src/main.cpp)\n");
+    await writeFixture(root, "src/main.cpp", "int main(void) { return 0; }\n");
+    await writeFixture(root, "src/helper.cpp", "int help(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const group = result.features.find((feature) => feature.title === "C/C++ source group src");
+
+    expect(group?.ownedFiles).toEqual([{ path: "src/helper.cpp", reason: "source group member" }]);
+  });
+
+  it("maps a loose CUDA kernel directory as a CUDA source group with concurrency", async () => {
+    const root = await fixtureRoot("clawpatch-cuda-group-");
+    await writeFixture(
+      root,
+      "kernels/reduce.cu",
+      "__global__ void reduce(float *x) { x[0] = 0; }\n",
+    );
+    await writeFixture(root, "kernels/reduce.cuh", "__global__ void reduce(float *x);\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const group = result.features.find((feature) => feature.title === "CUDA source group kernels");
+
+    expect(group?.tags).toContain("cuda");
+    expect(group?.trustBoundaries).toContain("concurrency");
+    expect(group?.ownedFiles).toEqual([
+      { path: "kernels/reduce.cu", reason: "source group member" },
+      { path: "kernels/reduce.cuh", reason: "source group member" },
+    ]);
+  });
+
   it("emits no C/C++ validation command for an autotools-only project", async () => {
     const root = await fixtureRoot("clawpatch-autotools-nullcmd-");
     await writeFixture(root, "Makefile.am", "bin_PROGRAMS = app\napp_SOURCES = main.c\n");
