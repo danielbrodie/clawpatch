@@ -11886,6 +11886,22 @@ add_executable(headerapp include/headers.hpp)
     expect(gpuapp?.trustBoundaries).toContain("concurrency");
   });
 
+  it("maps CMake and autotools build files as config features", async () => {
+    const root = await fixtureRoot("clawpatch-build-config-");
+    await writeFixture(root, "CMakeLists.txt", "project(app CXX)\nadd_executable(app main.cpp)\n");
+    await writeFixture(root, "CMakePresets.json", '{"version":6}\n');
+    await writeFixture(root, "configure.ac", "AC_INIT([app],[1.0])\n");
+    await writeFixture(root, "main.cpp", "int main(void) { return 0; }\n");
+
+    const project = await detectProject(root);
+    const result = await mapFeatures(root, project, []);
+    const titles = result.features.map((feature) => feature.title);
+
+    expect(titles).toContain("Project config CMakeLists.txt");
+    expect(titles).toContain("Project config CMakePresets.json");
+    expect(titles).toContain("Project config configure.ac");
+  });
+
   it("maps autotools targets from Makefile.in", async () => {
     const root = await fixtureRoot("clawpatch-autotools-makefile-in-");
     await writeFixture(
