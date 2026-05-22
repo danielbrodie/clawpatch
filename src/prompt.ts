@@ -390,6 +390,7 @@ export async function buildFixPrompt(
   for (const path of fixPromptPaths(finding, feature, config)) {
     fileBlocks.push(await rawFileBlock(root, path));
   }
+  const cudaBlock = featureIncludesCuda(feature) ? `\n${cudaGuidance()}\n` : "";
   return `You are clawpatch applying one small repair in the current repository.
 
 Fix only the finding below. Keep the patch minimal. Add or update focused tests when feasible.
@@ -403,7 +404,7 @@ After editing, return strict JSON only:
   "steps": ["string"],
   "validationCommands": ["string"]
 }
-
+${cudaBlock}
 Finding:
 ${JSON.stringify(finding, null, 2)}
 
