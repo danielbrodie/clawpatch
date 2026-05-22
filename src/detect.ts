@@ -249,6 +249,9 @@ async function languageDefaultCommands(
   if (languages.includes("ruby")) {
     return rubyDefaultCommands(root);
   }
+  if (languages.includes("c") || languages.includes("cpp") || languages.includes("cuda")) {
+    return cOrCppDefaultCommands(root);
+  }
 
   return {
     typecheck: null,
@@ -689,6 +692,31 @@ async function rubyDefaultCommands(root: string): Promise<ProjectCommands> {
     format: null,
     test: hasRspec ? `${run}rspec` : hasMinitest ? `${run}rake test` : null,
   };
+}
+
+async function cOrCppDefaultCommands(root: string): Promise<ProjectCommands> {
+  const makefileCommands = await makefileDefaultCommands(root);
+  if (makefileCommands !== null) {
+    return makefileCommands;
+  }
+  return { typecheck: null, lint: null, format: null, test: null };
+}
+
+async function makefileDefaultCommands(root: string): Promise<ProjectCommands | null> {
+  if (!(await pathExists(join(root, "Makefile")))) {
+    return null;
+  }
+  const source = await readFile(join(root, "Makefile"), "utf8").catch(() => "");
+  const test = makefileHasTarget(source, "check")
+    ? "make check"
+    : makefileHasTarget(source, "test")
+      ? "make test"
+      : null;
+  return { typecheck: "make", lint: null, format: null, test };
+}
+
+function makefileHasTarget(source: string, target: string): boolean {
+  return new RegExp(`^${target}\\s*:(?!=)`, "mu").test(source);
 }
 
 async function mixProjectInfo(root: string): Promise<MixProjectInfo> {
